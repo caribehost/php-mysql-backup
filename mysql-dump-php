@@ -1,4 +1,10 @@
 <?php
+/*
+Autor: CaribeHost | Cloud Service
+Website: https://www.caribehost.co
+Desarroladores : Galy Ricardo Cerda | Freddy Cohen Arbelaez
+Email: soporte@caribehost.co
+*/
 	//PARAMETROS DE LA BASE DATOS
 	$db_host= '';  //mysql host
 	$db_uname = '';  //user
