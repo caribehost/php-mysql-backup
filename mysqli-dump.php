@@ -3,8 +3,7 @@
 
 	// PHP BackUP MySQL ver. 1.0 from 2017-08-17
 	// Este script realiza backup de la base datos, lo almacena en un repositorio local
-	// permite controlar el numero de archivos en el repositorio e importarlo nuevamente
-	// a una base datos remota para mantener una copia funcional de la Base Datos.
+	// permite controlar el numero de archivos en el repositorio.
 	
 	// Author:      Freddy Cohen Arbelaez | Galy Ricardo Cerda 
 	// Company:     CaribeHost | Cloud Service 
