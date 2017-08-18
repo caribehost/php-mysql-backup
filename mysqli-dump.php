@@ -85,7 +85,8 @@
         if($row_count>0){
             $r = 0;
             while($row = $results->fetch_array()){
-                if(($r % 300)  == 0){
+		// NO MODIFIQUE EL RESIDUO, SE ESTABLECE EN 100
+                if(($r % 100)  == 0){
                     $contents .= $insert_head;
                 }
                 $contents .= "(";
@@ -103,7 +104,8 @@
                             $contents  .= ',';
                         }
                 }
-                if(($r+1) == $row_count || ($r % 300) == 299){
+		// NO MODIFIQUE EL RESIDUO, SE ESTABLECE EN 100
+                if(($r+1) == $row_count || ($r % 100) == 99){
                     $contents .= ");\n";
                 }else{
                     $contents .= "),";
