@@ -1,17 +1,38 @@
 <?php
-/*
-Autor: CaribeHost | Cloud Service
-Website: https://www.caribehost.co
-Desarroladores : Galy Ricardo Cerda | Freddy Cohen Arbelaez
-Email: soporte@caribehost.co
-*/
-	//PARAMETROS DE LA BASE DATOS
-	$db_host= '';  //mysql host
-	$db_uname = '';  //user
-	$db_password = ''; //pass
-	$db_to_backup = ''; //database name
+	error_reporting(E_ALL);
+
+	// PHP BackUP MySQL ver. 1.0 from 2017-08-17
+	// Este script realiza backup de la base datos, lo almacena en un repositorio local
+	// permite controlar el numero de archivos en el repositorio e importarlo nuevamente
+	// a una base datos remota para mantener una copia funcional de la Base Datos.
 	
-	$db_backup_path = ''; //ruta donde se almacena el archivo .sql eje: C:\/Inetpub\/vhosts\/project\/sqldump\/
+	// Author:      Freddy Cohen Arbelaez | Galy Ricardo Cerda 
+	// Company:     CaribeHost | Cloud Service 
+	// Copyright:   GPL (C) 2003-2017
+	// URL:   		https://www.caribehost.co/
+	// e-Mail:   	soporte@caribehost.co
+
+	// This program is free software; you can redistribute it and/or modify it under the
+	// terms of the GNU General Public License as published by the Free Software Foundation;
+	// either version 2 of the License, or (at your option) any later version.
+
+	// THIS SCRIPT IS PROVIDED AS IS, WITHOUT ANY WARRANTY OR GUARANTEE OF ANY KIND
+
+	// USAGE
+
+	// */15 * * * * /path-source/mysqli-dump.php source_db_host=localhost source_db_user=root source_db_pass=12345 source_db_name=bd_test
+
+	//OBTENEMOS DEL ARRAY() PARAMETROS DE LA BASE DATOS LOCAL
+	parse_str($argv[1], $params); $source_db_host = $params['source_db_host'];
+	parse_str($argv[2], $params); $source_db_user = $params['source_db_user'];
+	parse_str($argv[3], $params); $source_db_pass = $params['source_db_pass'];
+	parse_str($argv[4], $params); $source_db_name = $params['source_db_name'];
+	
+	ini_set('memory_limit', '-1');
+		
+	// RUTA ALMACENAMIENTO BACKUP
+	$db_backup_path = ''; //ESCRIBA LA RUTA DE LA CARPETA DONDE SE ALMACENARA EL BACKUP (IMPORTANTE ESTA TENGA PERMISOS DE ESCRITURA)
+
 	$db_exclude_tables = array();
 	
 	//ESTABLECEMOS LA ZONA HORARIA
@@ -19,13 +40,14 @@ Email: soporte@caribehost.co
 	
 	$mtables = array(); 
 	
-	$contents = "-- Database: `".$db_to_backup."` --\n";
+	$contents = "-- Database: `".$source_db_name."` --\n";
 	
 	//CONEXIÓN CON LA BASE DATOS
-	$mysqli = new mysqli($db_host, $db_uname, $db_password, $db_to_backup);
+	$mysqli = new mysqli($source_db_host, $source_db_user, $source_db_pass, $source_db_name);
 	
     if ($mysqli->connect_error) {
-        die('Error : ('. $mysqli->connect_errno .') '. $mysqli->connect_error);
+		trigger_error('Error : ('. $mysqli->connect_errno .') '. $mysqli->connect_error, E_USER_ERROR);
+        die();
     }
     
 	mysqli_set_charset( $mysqli, 'utf8');
@@ -37,7 +59,6 @@ Email: soporte@caribehost.co
             $mtables[] = $row[0];
         }
     }
-
     foreach($mtables as $table){
         $contents .= "-- Table `".$table."` --\n\n";
 		
@@ -46,83 +67,75 @@ Email: soporte@caribehost.co
         while($row = $results->fetch_array()){
             $contents .= $row[1].";\n\n";
         }
-
         $results = $mysqli->query("SELECT * FROM `".$table."` ");
         $row_count = $results->num_rows;
         $fields = $results->fetch_fields();
         $fields_count = count($fields);
        
-	    $insert_head = "LOCK TABLES `".$table."` WRITE ;\n"; 
-        $insert_head .= "INSERT INTO `".$table."` \n"; 
-        $insert_head .= " VALUES (\n";       
+	    $contents .= "LOCK TABLES `".$table."` WRITE;\n";
+		$insert_head = "INSERT INTO `".$table."` (";
+        for($i=0; $i < $fields_count; $i++){
+            $insert_head  .= "`".$fields[$i]->name."`";
+                if($i < $fields_count-1){
+                        $insert_head  .= ', ';
+                    }
+        }
+        $insert_head .=  ")";
+        $insert_head .= " VALUES"; 
                
         if($row_count>0){
             $r = 0;
-			
             while($row = $results->fetch_array()){
-                if($r == 0){
+                if(($r % 300)  == 0){
                     $contents .= $insert_head;
                 }
-                //$contents .= "(";
+                $contents .= "(";
                 for($i=0; $i < $fields_count; $i++){
                     $row_content =  str_replace("\n","\\n",$mysqli->real_escape_string($row[$i]));
-					          $row_content =  str_replace("{}","\{\}",$mysqli->real_escape_string($row[$i]));
-                   
-					
-					switch($fields[$i]->type){
-                        case 3: case 8:
+                    
+                    switch($fields[$i]->type){
+                        case 246: case 8: case 3: case 2:
                             $contents .=  $row_content;
-							break;
+                            break;
                         default:
                             $contents .= "'". $row_content ."'";
-							
                     }
                     if($i < $fields_count-1){
-                            $contents  .= ', ';
-					}
-					if($i == $fields_count-1){
-						$contents  .= '), (';
-					}
+                            $contents  .= ',';
+                        }
                 }
-                if(($r+1) == $row_count){
-                    $contents .= ");\n\n";
-					$contents =  str_replace(", ()","",$contents);
-					$contents =  str_replace("'0.00'","0.00",$contents);
-					$contents =  str_replace(", ,",",NULL,",$contents);
-					
-				}else
+                if(($r+1) == $row_count || ($r % 300) == 299){
+                    $contents .= ");\n";
+                }else{
+                    $contents .= "),";
+                }
                 $r++;
             }
         }
 		$contents .= "UNLOCK TABLES;\n\n";
+		$contents =  str_replace(",," , ",NULL,",$contents);
+		$contents =  str_replace(",)" , ",NULL)",$contents);
     }
-   	//var_dump($contents);
-	//die();
-	
-    
-	
-	  // VERIFICAMOS CANTOS BACKUP HAY 
+   	
+	// VERIFICAMOS CANTOS BACKUP HAY 
 		$creaBU = false; //la usaremos como sémaforo para saber si pasó sin problemas por las diferentes validaciones.
-		$files 	= glob('C:\/Inetpub\/vhosts\/ministerioriosdevida.org\/sqldump\/' . '*.sql'); //busca todos los ficheros que sean .sql
-		
-    //Verifica la cantidad de ficheros y si es que hay que borrar y cual.
+		$files 	= glob($db_backup_path . '*.sql'); //busca todos los ficheros que sean .sql
+		//Verifica la cantidad de ficheros y si es que hay que borrar y cual.
 		if ( $files !== false ){
 			$cant = count( $files );
 			if($cant >= 45){
-				
-        //genera un array para tomar el archivo más antiguo de los que se encuentran
+				//genera un array para tomar el archivo más antiguo de los que se encuentran
 				array_multisort(
 					array_map( 'filemtime', $files ),
 					SORT_NUMERIC,
 					SORT_ASC,
 					$files
 				);
-				
-        //Si ya se alcanzó el máximo número, se borra el backup más antiguo.
+				//Si ya se alcanzó el máximo número, se borra el backup más antiguo.
 				unlink($files[0]);
 				$creaBU 	= true;
 			}else{
-				//áun no se llega al limite de respaldos
+				//áun no se llega a los 45 respaldos
 				$creaBU 	= true;
 			}
 		}else{
@@ -136,19 +149,16 @@ Email: soporte@caribehost.co
 				mkdir ( $db_backup_path, 0777, true );
 			 }
 
-			$backup_file_name = $db_to_backup."-".date( "dmY").".sql";
+			$backup_file_name = $source_db_name."-".date( "dmY").".sql";
 
 			$fp = fopen($db_backup_path."/".$backup_file_name ,'w+');
 
-			$dump="";
 			if (($result = fwrite($fp, $contents))) {
-				$dump = "Backup file created '$backup_file_name' ($result)<br>";
+				echo "Backup file created"." ".$backup_file_name." "."(".$result.")";
+			} else {
+				trigger_error("No se pudo crear el BackUP", E_USER_ERROR);
 			}
 			fclose($fp);
 
-			echo $dump;
-
 		endif;
-	 
-
 ?>
